@@ -34,6 +34,7 @@ namespace dotnet_rpg.Controllers
                 Summary = Summaries[rng.Next(Summaries.Length)]
             })
             .ToArray();
+            //test
         }
     }
 }
