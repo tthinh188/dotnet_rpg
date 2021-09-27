@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using AutoMapper;
 using dotnet_rpg.Data;
 using dotnet_rpg.Dtos.Fight;
 using dotnet_rpg.Models;
@@ -11,8 +13,10 @@ namespace dotnet_rpg.Services.FightService
     public class FightService : IFightService
     {
         private readonly DataContext context;
-        public FightService(DataContext context)
+        private readonly IMapper mapper;
+        public FightService(DataContext context, IMapper mapper)
         {
+            this.mapper = mapper;
             this.context = context;
         }
 
@@ -23,14 +27,15 @@ namespace dotnet_rpg.Services.FightService
                 Data = new FightResultDTO()
             };
 
-            try {
+            try
+            {
                 var Characters = await context.Characters
                     .Include(c => c.Weapon)
                     .Include(c => c.Skills)
                     .Where(c => request.CharacterIds.Contains(c.Id)).ToListAsync();
 
                 bool defeated = false;
-                while(!defeated)
+                while (!defeated)
                 {
                     foreach (var attacker in Characters)
                     {
@@ -41,7 +46,7 @@ namespace dotnet_rpg.Services.FightService
                         string attackUsed = string.Empty;
 
                         bool useWeapon = new Random().Next(2) == 0;
-                        if(useWeapon)
+                        if (useWeapon)
                         {
                             attackUsed = attacker.Weapon.Name;
                             damage = DoWeaponAttack(attacker, opponent);
@@ -56,8 +61,8 @@ namespace dotnet_rpg.Services.FightService
 
                         response.Data.Log
                             .Add($"{attacker.Name} attacks {opponent.Name} using {attackUsed} with {(damage >= 0 ? damage : 0)} damage.");
-                    
-                        if(opponent.Hitpoints <= 0)
+
+                        if (opponent.Hitpoints <= 0)
                         {
                             defeated = true;
                             attacker.Victories++;
@@ -77,7 +82,9 @@ namespace dotnet_rpg.Services.FightService
                 });
 
                 await context.SaveChangesAsync();
-            } catch (Exception ex) {
+            }
+            catch (Exception ex)
+            {
                 response.Success = false;
                 response.Message = ex.Message;
             }
@@ -123,11 +130,12 @@ namespace dotnet_rpg.Services.FightService
                 };
 
             }
-            catch (Exception ex) {
+            catch (Exception ex)
+            {
                 response.Success = false;
                 response.Message = ex.Message;
             }
-            return response;        
+            return response;
         }
 
         private static int DoSkillAttack(Character attacker, Character opponent, Skill skill)
@@ -170,7 +178,8 @@ namespace dotnet_rpg.Services.FightService
                 };
 
             }
-            catch (Exception ex) {
+            catch (Exception ex)
+            {
                 response.Success = false;
                 response.Message = ex.Message;
             }
@@ -185,6 +194,22 @@ namespace dotnet_rpg.Services.FightService
             if (damage > 0)
                 opponent.Hitpoints -= damage;
             return damage;
+        }
+
+        public async Task<ServiceResponse<List<HighScoreDTO>>> GetHighScore()
+        {
+            var characters = await context.Characters
+                .Where(c => c.Fights > 0)
+                .OrderByDescending(c => c.Victories)
+                .ThenBy(c => c.Defeats)
+                .ToListAsync();
+
+            var response = new ServiceResponse<List<HighScoreDTO>>
+            {
+                Data = characters.Select(c => mapper.Map<HighScoreDTO>(c)).ToList()
+            };
+
+            return response;
         }
     }
 }
